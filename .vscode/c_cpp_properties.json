@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "HIP",
+            "includePath": [
+              "${workspaceFolder}/**",
+              "/opt/rocm-6.3.2/include/**",
+              "/opt/rocm-6.3.2/include/hip/**"
+            ],
+            "defines": [
+              "__HIP_PLATFORM_AMD__",
+              "__HCC__",
+              "__HIPCC__"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "linux-gcc-x64"
+          }
+    ],
+    "version": 4
+}
