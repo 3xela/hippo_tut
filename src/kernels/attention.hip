@@ -16,7 +16,7 @@ void launch_attention(float* Q, float* K, float* V, float* output, float* worksp
     
     launch_scale(qk, qk_scaled, seq_len, seq_len, scale);
     
-    launch_softmax_rows(qk_scaled, attn_weights, seq_len, seq_len);
+    launch_softmax(qk_scaled, attn_weights, seq_len, seq_len);
     
     launch_tiled_matmul(attn_weights, V, output, seq_len, d_model, seq_len);
 }

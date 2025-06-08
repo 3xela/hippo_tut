@@ -24,7 +24,7 @@ __global__ void sum_vec(float* a, float* output){
 	}
 }	
 
-__global__ void softmax_rows(float* input, float* output, int rows, int cols){
+__global__ void softmax(float* input, float* output, int rows, int cols){
 	__shared__ float sdata[256];
 	
 	int row = blockIdx.x;
@@ -135,10 +135,10 @@ __global__ void layer_norm(float* x, float* gamma, float* beta, float* y, int ro
         y[idx] = gamma[col] * (x[idx] - mean) / sqrtf(variance + 1e-5f) + beta[col];
     }
 }
-void launch_softmax_rows(float* input, float* output, int rows, int cols){
+void launch_softmax(float* input, float* output, int rows, int cols){
 	dim3 threads(256);
     dim3 blocks(rows);
-	softmax_rows<<<blocks,threads>>>(input,output,rows,cols);
+	softmax<<<blocks,threads>>>(input,output,rows,cols);
 }
 
 void launch_layer_norm(float* x, float* gamma, float* beta, float* y, int rows, int cols){
