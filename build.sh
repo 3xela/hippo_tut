@@ -1,0 +1,1 @@
+hipcc -I src/headers src/basics.hip src/matrix.hip src/tiled_matrix.hip src/softmax.hip src/mem.hip src/attention.hip src/activations.hip src/transformer.hip -o bin/transformer

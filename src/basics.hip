@@ -9,12 +9,12 @@ __global__ void add(int* a, int* b, int* c, int n) {
     }
 }
 
-int main() {
-    int a = 10;
-    int* ptr = &a;
-    int size = *ptr;
+// int main() {
+//     int a = 10;
+//     int* ptr = &a;
+//     int size = *ptr;
 
-    add<<<2,32>>>(&size, &size, &size, 100);
-    hipDeviceSynchronize();
-    return 0;
-}
+//     add<<<2,32>>>(&size, &size, &size, 100);
+//     hipDeviceSynchronize();
+//     return 0;
+// }
