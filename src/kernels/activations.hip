@@ -25,3 +25,16 @@ void launch_relu(float* x, float* output, int size) {
     dim3 blocks((size + 255) / 256);
     relu<<<blocks, threads>>>(x, output, size);
 }
+__global__ void gelu(float* input, float* output, int n) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+        float x = input[idx];
+        output[idx] = 0.5f * x * (1.0f + tanhf(0.7978845608f * (x + 0.044715f * x * x * x)));
+    }
+}
+
+void launch_gelu(float* input, float* output, int n) {
+    int threads = 256;
+    int blocks = (n + threads - 1) / threads;
+    gelu<<<blocks, threads>>>(input, output, n);
+}

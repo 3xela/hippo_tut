@@ -23,4 +23,6 @@ void launch_multihead_attention(float* Q, float* K, float* V, float* output,
     float* workspace, int seq_len, int d_model, int num_heads);
 
 void launch_add_residual(float* x, float* residual, float* output, int size);
+
+void launch_gelu(float* input, float* output, int n);
 #endif
