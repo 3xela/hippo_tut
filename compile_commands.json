@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/home/alex/hippo/hippo_tut",
+    "command": "hipcc -x hip --offload-arch=gfx1101 -Isrc/headers -Isrc/tensor -c src/main.hip",
+    "file": "src/main.hip"
+  },
+  {
+    "directory": "/home/alex/hippo/hippo_tut",
+    "command": "hipcc -x hip --offload-arch=gfx1101 -Isrc/headers -Isrc/tensor -c src/tensor/tensor.hip",
+    "file": "src/tensor/tensor.hip"
+  },
+  {
+    "directory": "/home/alex/hippo/hippo_tut",
+    "command": "hipcc -x hip --offload-arch=gfx1101 -Isrc/headers -Isrc/tensor -c src/kernels/softmax.hip",
+    "file": "src/kernels/softmax.hip"
+  },
+  {
+    "directory": "/home/alex/hippo/hippo_tut",
+    "command": "hipcc -x hip --offload-arch=gfx1101 -Isrc/headers -Isrc/tensor -c src/kernels/matrix.hip",
+    "file": "src/kernels/matrix.hip"
+  }
+]

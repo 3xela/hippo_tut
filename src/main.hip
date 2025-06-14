@@ -2,13 +2,12 @@
 #include "transformers.h"
 #include "tensor.h"
 
-
 int main() {
     // model config
-    int seq_len = 128;
-    int d_model = 512;
-    int num_heads = 8;
-    int d_ff = 2048;
+    size_t seq_len = 128;
+    size_t d_model = 512;
+    size_t num_heads = 8;
+    size_t d_ff = 2048;
     
     // create transformer block on host
     TransformerBlock h_block;
@@ -29,14 +28,14 @@ int main() {
     h_block.ln2_beta = (float*)malloc(d_model * sizeof(float));
     
     // simple initialization
-    for (int i = 0; i < d_model * d_model; i++) {
+    for (size_t i = 0; i < d_model * d_model; i++) {
         h_block.W_q[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
         h_block.W_k[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
         h_block.W_v[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
         h_block.W_o[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
     }
     
-    for (int i = 0; i < d_model; i++) {
+    for (size_t i = 0; i < d_model; i++) {
         h_block.ln1_gamma[i] = 1.0f;
         h_block.ln1_beta[i] = 0.0f;
         h_block.ln2_gamma[i] = 1.0f;
@@ -48,21 +47,21 @@ int main() {
     allocate_transformer_block(&d_block, &h_block);
     
     // create input tensor
-    Tensor* input = new Tensor(seq_len * d_model);
-    for (int i = 0; i < seq_len * d_model; i++) {
-        input->data[i] = 0.1f * (rand() / (float)RAND_MAX);
+    Tensor* input = new Tensor(Shape({seq_len * d_model}));
+    for (size_t i = 0; i < seq_len * d_model; i++) {
+        input->data()[i] = 0.1f * (rand() / (float)RAND_MAX);
     }
     input->to_device();
     
     // output tensor
-    Tensor* output = Tensor::device(seq_len * d_model);
+    Tensor* output = Tensor::device(Shape({seq_len * d_model}));
     
     // workspace
     size_t workspace_size = seq_len * d_model * 10 + seq_len * seq_len * 4 + seq_len * d_ff * 2;
-    Tensor* workspace = Tensor::device(workspace_size);
+    Tensor* workspace = Tensor::device(Shape({workspace_size}));
     
     // run forward pass
-    transformer_block_forward(&d_block, input->data, output->data, workspace->data, seq_len, num_heads);
+    transformer_block_forward(&d_block, input->data(), output->data(), workspace->data(), seq_len, num_heads);
     
     // get results
     output->to_host();
@@ -70,7 +69,7 @@ int main() {
     // print some outputs
     printf("Output (first 10 values):\n");
     for (int i = 0; i < 10; i++) {
-        printf("%.4f ", output->data[i]);
+        printf("%.4f ", output->data()[i]);
     }
     printf("\n");
     
