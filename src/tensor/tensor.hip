@@ -5,6 +5,16 @@
 #include <iostream>
 #include <random>
 
+Tensor::Tensor(const Shape& shape) : shape_(shape), on_device_(false), requires_grad(false), grad_(nullptr) {
+    size_ = shape_.size();
+    data_ = (float*)malloc(size_ * sizeof(float));
+}
+
+Tensor::Tensor(const std::vector<size_t>& dims) : shape_(dims), on_device_(false), requires_grad(false), grad_(nullptr) {
+    size_ = shape_.size();
+    data_ = (float*)malloc(size_ * sizeof(float));
+}
+
 Tensor::Tensor(const Shape& shape) : shape_(shape), on_device_(false) {
     size_ = shape_.size();
     data_ = (float*)malloc(size_ * sizeof(float));
@@ -116,4 +126,81 @@ Tensor::~Tensor() {
     } else {
         free(data_);
     }
+}
+Tensor* Tensor::matmul(Tensor* other) {
+    Tensor* output = new Tensor(Shape({shape_[0], other->shape_[1]}));
+    launch_matmul(data_, other->data_, output->data_, ...);
+    
+    if (requires_grad_ || other->requires_grad) {
+        output->requires_grad = true;
+        output->parents_ = {this, other};
+        output->backward_fn_ = [=]() {
+            // grad_input = grad_output @ other^T
+            launch_matmul(output->grad_, other->data_, this->grad_, ...);
+            // grad_other = input^T @ grad_output  
+            launch_matmul(this->data_, output->grad_, other->grad_, ...);
+        };
+    }
+    return output;
+}
+void Tensor::backward() {
+    if (!grad_) {
+        grad_ = allocate_like(data_);
+        fill_ones(grad_);  // gradient of output w.r.t itself is 1
+    }
+    
+    if (backward_fn_) {
+        backward_fn_();  // compute gradients for parents
+        for (auto parent : parents_) {
+            parent->backward();  // recursive
+        }
+    }
+}
+
+Tensor* Tensor::matmul(Tensor* other) {
+    // Shape check
+    if (shape_[shape_.ndim()-1] != other->shape_[shape_.ndim()-2]) {
+        throw std::invalid_argument("Matmul dimension mismatch");
+    }
+    
+    // Create output tensor
+    std::vector<size_t> out_dims = shape_.dims();
+    out_dims[out_dims.size()-1] = other->shape_[shape_.ndim()-1];
+    Tensor* output = new Tensor(Shape(out_dims));
+    
+    // Move to device if needed
+    if (on_device_) output->to_device();
+    
+    // Forward pass
+    launch_matmul(data_, other->data_, output->data_, 
+                  shape_[0], other->shape_[1], shape_[1]);
+    
+    // Setup backward pass if needed
+    if (requires_grad || other->requires_grad) {
+        output->requires_grad = true;
+        output->parents_ = {this, other};
+        
+        output->backward_fn_ = [this, other, output]() {
+            if (this->requires_grad) {
+                if (!this->grad_) {
+                    this->grad_ = (float*)hipMalloc(this->size_ * sizeof(float));
+                    hipMemset(this->grad_, 0, this->size_ * sizeof(float));
+                }
+                // grad_input = grad_output @ other^T
+                launch_matmul_backward_input(output->grad_, other->data_, this->grad_,
+                                           output->shape_[0], output->shape_[1], other->shape_[0]);
+            }
+            if (other->requires_grad) {
+                if (!other->grad_) {
+                    other->grad_ = (float*)hipMalloc(other->size_ * sizeof(float));
+                    hipMemset(other->grad_, 0, other->size_ * sizeof(float));
+                }
+                // grad_other = input^T @ grad_output
+                launch_matmul_backward_weight(this->data_, output->grad_, other->grad_,
+                                            this->shape_[1], this->shape_[0], output->shape_[1]);
+            }
+        };
+    }
+    
+    return output;
 }

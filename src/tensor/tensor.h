@@ -4,14 +4,18 @@
 #include <vector>
 #include <string>
 #include "shape.h"
+#include <functional>
 
 class Tensor {
 private:
     float* data_;
+    float* grad_;
+    bool requires_grad;
     Shape shape_;
     size_t size_;
     bool on_device_;
-    
+    std::vector<Tensor*> parents_;
+    std::function<void()> backward_fn_;
 public:
     // Constructors
     Tensor(const Shape& shape);
@@ -37,7 +41,25 @@ public:
     void fill(float value);
     void random(float min = 0.0f, float max = 1.0f);
     void print(const std::string& name = "") const;
+
+    // In tensor.h
+    Tensor* requires_grad_(bool req = true) { 
+        requires_grad = req; 
+        return this; 
+    }
+
+    Tensor* matmul(Tensor* other);
     
+    // Gradient methods
+    void backward();
+    void zero_grad();
+    Tensor* detach();
+    Tensor* requires_grad_(bool req = true);
+    
+    // Gradient access
+    float* grad() { return grad_; }
+    bool requires_grad() const { return requires_grad; }
+
     ~Tensor();
 };
 
