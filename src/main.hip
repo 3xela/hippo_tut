@@ -1,88 +1,79 @@
 #include <hip/hip_runtime.h>
-#include "transformers.h"
 #include "tensor.h"
+#include "kernels.h"
+#include "backward.h"
+#include <cstdlib>
+#include <iostream>
+#include <iomanip>
 
-int main() {
-    // model config
-    size_t seq_len = 128;
-    size_t d_model = 512;
-    size_t num_heads = 8;
-    size_t d_ff = 2048;
+int main(){
+    std::cout << "Testing ReLU Backward Implementation\n";
+    std::cout << "====================================\n\n";
+
+    size_t tensor_size = 10;  // Smaller size for easier verification
+
+    // Create test tensor with known values
+    Tensor* input_tensor = new Tensor(Shape({tensor_size}));
+    Tensor* grad_output = new Tensor(Shape({tensor_size}));
     
-    // create transformer block on host
-    TransformerBlock h_block;
-    h_block.d_model = d_model;
-    h_block.num_heads = num_heads;
-    h_block.d_ff = d_ff;
+    input_tensor->to_device();
+    grad_output->to_device();
+
+    // Set up test data: mix of positive, negative, and zero values
+    float test_inputs[] = {-2.0f, -1.0f, -0.5f, 0.0f, 0.5f, 1.0f, 2.0f, 3.0f, -1.5f, 4.0f};
+    float test_grad_outputs[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
     
-    // initialize weights on host (random for now)
-    h_block.W_q = (float*)malloc(d_model * d_model * sizeof(float));
-    h_block.W_k = (float*)malloc(d_model * d_model * sizeof(float));
-    h_block.W_v = (float*)malloc(d_model * d_model * sizeof(float));
-    h_block.W_o = (float*)malloc(d_model * d_model * sizeof(float));
-    h_block.W_ff1 = (float*)malloc(d_model * d_ff * sizeof(float));
-    h_block.W_ff2 = (float*)malloc(d_ff * d_model * sizeof(float));
-    h_block.ln1_gamma = (float*)malloc(d_model * sizeof(float));
-    h_block.ln1_beta = (float*)malloc(d_model * sizeof(float));
-    h_block.ln2_gamma = (float*)malloc(d_model * sizeof(float));
-    h_block.ln2_beta = (float*)malloc(d_model * sizeof(float));
-    
-    // simple initialization
-    for (size_t i = 0; i < d_model * d_model; i++) {
-        h_block.W_q[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
-        h_block.W_k[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
-        h_block.W_v[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
-        h_block.W_o[i] = 0.02f * (rand() / (float)RAND_MAX - 0.5f);
+    // Copy test data to tensors
+    for (size_t i = 0; i < tensor_size; i++) {
+        input_tensor->data()[i] = test_inputs[i];
+        grad_output->data()[i] = test_grad_outputs[i];
     }
-    
-    for (size_t i = 0; i < d_model; i++) {
-        h_block.ln1_gamma[i] = 1.0f;
-        h_block.ln1_beta[i] = 0.0f;
-        h_block.ln2_gamma[i] = 1.0f;
-        h_block.ln2_beta[i] = 0.0f;
+
+    std::cout << "Input values:\n";
+    for (size_t i = 0; i < tensor_size; i++) {
+        std::cout << std::setw(6) << std::fixed << std::setprecision(1) 
+                  << input_tensor->data()[i] << " ";
     }
+    std::cout << "\n\n";
+
+    // Test ReLU backward: gradient should be 1 for positive inputs, 0 for negative/zero
+    launch_relu_backwards(input_tensor->data(), grad_output->data(), tensor_size);
     
-    // move to device
-    TransformerBlock d_block;
-    allocate_transformer_block(&d_block, &h_block);
+    // Synchronize to ensure kernel completion
+    hipDeviceSynchronize();
     
-    // create input tensor
-    Tensor* input = new Tensor(Shape({seq_len * d_model}));
-    for (size_t i = 0; i < seq_len * d_model; i++) {
-        input->data()[i] = 0.1f * (rand() / (float)RAND_MAX);
+    grad_output->to_host();
+
+    std::cout << "ReLU Backward Results:\n";
+    std::cout << "Expected: [0, 0, 0, 0, 1, 1, 1, 1, 0, 1]\n";
+    std::cout << "Actual:   [";
+    for (size_t i = 0; i < tensor_size; i++) {
+        std::cout << (int)grad_output->data()[i];
+        if (i < tensor_size - 1) std::cout << ", ";
     }
-    input->to_device();
+    std::cout << "]\n\n";
+
+    // Verify correctness
+    bool all_correct = true;
+    float expected[] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f};
     
-    // output tensor
-    Tensor* output = Tensor::device(Shape({seq_len * d_model}));
-    
-    // workspace
-    size_t workspace_size = seq_len * d_model * 10 + seq_len * seq_len * 4 + seq_len * d_ff * 2;
-    Tensor* workspace = Tensor::device(Shape({workspace_size}));
-    
-    // run forward pass
-    transformer_block_forward(&d_block, input->data(), output->data(), workspace->data(), seq_len, num_heads);
-    
-    // get results
-    output->to_host();
-    
-    // print some outputs
-    printf("Output (first 10 values):\n");
-    for (int i = 0; i < 10; i++) {
-        printf("%.4f ", output->data()[i]);
+    for (size_t i = 0; i < tensor_size; i++) {
+        if (grad_output->data()[i] != expected[i]) {
+            all_correct = false;
+            std::cout << "MISMATCH at index " << i << ": expected " 
+                      << expected[i] << ", got " << grad_output->data()[i] << "\n";
+        }
     }
-    printf("\n");
-    
-    // cleanup
-    delete input;
-    delete output;
-    delete workspace;
-    free_transformer_block(&d_block);
-    
-    // free host memory
-    free(h_block.W_q);
-    free(h_block.W_k);
-    // ... etc
+
+    if (all_correct) {
+        std::cout << "✅ ReLU Backward test PASSED!\n";
+    } else {
+        std::cout << "❌ ReLU Backward test FAILED!\n";
+    }
+
+    // Cleanup
+    delete input_tensor;
+    delete grad_output;
     
     return 0;
 }

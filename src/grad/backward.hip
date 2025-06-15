@@ -42,3 +42,17 @@ void launch_matmul_backward_B(float* A, float* grad_C, float* grad_B, int M, int
     dim3 blocks((N + 15) / 16, (K + 15) / 16);
     matmul_backward_B<<<blocks, threads>>>(A, grad_C, grad_B, M, N, K);
 }
+
+
+__global__ void relu_backwards(float* input, float* output, int size) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        output[idx] = input[idx] > 0 ? 1 : 0;
+    }
+}
+
+void launch_relu_backwards(float* input, float* output, int size) {
+    dim3 threads(16, 16);
+    dim3 blocks((size + 15) / 16);
+    relu_backwards<<<blocks, threads>>>(input, output, size);
+} 

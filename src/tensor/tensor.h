@@ -54,11 +54,10 @@ public:
     void backward();
     void zero_grad();
     Tensor* detach();
-    Tensor* requires_grad_(bool req = true);
     
     // Gradient access
     float* grad() { return grad_; }
-    bool requires_grad() const { return requires_grad; }
+    bool get_requires_grad() const { return requires_grad; }
 
     ~Tensor();
 };
