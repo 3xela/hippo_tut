@@ -3,3 +3,5 @@
 - transformer structs implemented
 - basic Tensor functinoality
 - TODO/IPR: backwards kernels, keeping track of gradients, gradient computation
+
+- maybe gonna get done at some point: linting / formatter
